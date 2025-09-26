@@ -19,52 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Deploy to Vercel Previews on pull request
-      - name: Get branch preview subdomain
-        if: github.event_name == 'pull_request'
-        env:
-          HEAD_REF: ${{ github.head_ref }}
-          REF_NAME: ${{ github.ref_name }}
+      - name: Prepare DBT project for deployment
         run: |
-          BRANCH_PREVIEW_SUBDOMAIN=$(echo "${HEAD_REF:-$REF_NAME}" | sed -e 's/[^a-zA-Z0-9-]/-/g; s/^-*//; s/-*$//')
-          echo "$BRANCH_PREVIEW_SUBDOMAIN"
-          echo "BRANCH_PREVIEW_SUBDOMAIN=$BRANCH_PREVIEW_SUBDOMAIN" >> "${GITHUB_ENV}"
-
-      - name: Get PR fetch depth
-        if: github.event.pull_request
-        run: echo "PR_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-
-      - name: Checkout main branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/checkout@v4
-
-      - name: Checkout PR branch
-        if: github.event.pull_request
-        uses: actions/checkout@v4
-
-      - name: Publish Preview to Vercel
-        uses: amondnet/vercel-action@v25
-        if: github.event_name == 'pull_request'
-        with:
-          github-comment: ${{ github.event.pull_request && env.CHANGES_ENTRY || true }}
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.DAGSTER_U_VERCEL_PROJECT_ID }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          scope: ${{ secrets.VERCEL_ORG_ID }}
-          alias-domains: ${{ env.BRANCH_PREVIEW_SUBDOMAIN }}.dagster-university.dagster-docs.io
-
-      # Deploy to Vercel Production on push to main branch
-      - name: Checkout docs-prod branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/checkout@v4
-
-      - name: Publish to Vercel Production
-        uses: amondnet/vercel-action@v25
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.DAGSTER_U_VERCEL_PROJECT_ID }}
-          vercel-args: "--prod"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          scope: ${{ secrets.VERCEL_ORG_ID }}
+          python -m pip install pip --upgrade
+          cd project-repo
+          pip install . --upgrade --upgrade-strategy eager
+          dagster-dbt project prepare-and-package --file dagster_and_dbt/project.py
+        shell: bash
